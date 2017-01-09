@@ -1,4 +1,5 @@
 *.[ao]
+*.cmd
 *.orig
 *.tar.*
 *.s
@@ -11,6 +12,7 @@
 *.orig
 *.rej
 *.ko
+.tmp_versions
 Module.symvers
 modules.order
 
