@@ -210,6 +210,7 @@ struct fsync_inode_entry {
 static inline int update_nats_in_cursum(struct f2fs_journal *journal, int i)
 {
 	int before = nats_in_cursum(journal);
+
 	journal->n_nats = cpu_to_le16(before + i);
 	return before;
 }
@@ -217,6 +218,7 @@ static inline int update_nats_in_cursum(struct f2fs_journal *journal, int i)
 static inline int update_sits_in_cursum(struct f2fs_journal *journal, int i)
 {
 	int before = sits_in_cursum(journal);
+
 	journal->n_sits = cpu_to_le16(before + i);
 	return before;
 }
@@ -302,12 +304,14 @@ static inline void make_dentry_ptr(struct inode *inode,
 
 	if (type == 1) {
 		struct f2fs_dentry_block *t = (struct f2fs_dentry_block *)src;
+
 		d->max = NR_DENTRY_IN_BLOCK;
 		d->bitmap = &t->dentry_bitmap;
 		d->dentry = t->dentry;
 		d->filename = t->filename;
 	} else {
 		struct f2fs_inline_dentry *t = (struct f2fs_inline_dentry *)src;
+
 		d->max = NR_INLINE_DENTRY;
 		d->bitmap = &t->dentry_bitmap;
 		d->dentry = t->dentry;
@@ -1454,6 +1458,7 @@ static inline struct page *f2fs_grab_cache_page(struct address_space *mapping,
 {
 #ifdef CONFIG_F2FS_FAULT_INJECTION
 	struct page *page = find_lock_page(mapping, index);
+
 	if (page)
 		return page;
 
@@ -1537,6 +1542,7 @@ static inline void f2fs_radix_tree_insert(struct radix_tree_root *root,
 static inline bool IS_INODE(struct page *page)
 {
 	struct f2fs_node *p = F2FS_NODE(page);
+
 	return RAW_IS_INODE(p);
 }
 
@@ -1550,6 +1556,7 @@ static inline block_t datablock_addr(struct page *node_page,
 {
 	struct f2fs_node *raw_node;
 	__le32 *addr_array;
+
 	raw_node = F2FS_NODE(node_page);
 	addr_array = blkaddr_in_node(raw_node);
 	return le32_to_cpu(addr_array[offset]);
@@ -1784,6 +1791,7 @@ static inline unsigned int addrs_per_inode(struct inode *inode)
 static inline void *inline_xattr_addr(struct page *page)
 {
 	struct f2fs_inode *ri = F2FS_INODE(page);
+
 	return (void *)&(ri->i_addr[DEF_ADDRS_PER_INODE -
 					F2FS_INLINE_XATTR_ADDRS]);
 }
@@ -1840,6 +1848,7 @@ static inline bool f2fs_is_drop_cache(struct inode *inode)
 static inline void *inline_data_addr(struct page *page)
 {
 	struct f2fs_inode *ri = F2FS_INODE(page);
+
 	return (void *)&(ri->i_addr[1]);
 }
 
