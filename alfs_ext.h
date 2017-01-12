@@ -59,7 +59,7 @@ struct alfs_info {
 };
 
 /* some inline functions */
-static inline struct alfs_info *ALFS_RI(struct f2fs_sb_info *sbi)
+static inline struct alfs_info *ALFS_AI(struct f2fs_sb_info *sbi)
 {
 	return (struct alfs_info *)(sbi->ai);
 }

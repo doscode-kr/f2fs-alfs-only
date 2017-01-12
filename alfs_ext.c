@@ -259,7 +259,7 @@ int8_t alfs_writepage (
  */
 static int32_t create_metalog_mapping_table (struct f2fs_sb_info* sbi)
 {
-	struct alfs_info* ri = ALFS_RI (sbi);
+	struct alfs_info* ai = ALFS_AI (sbi);
 	struct page* page = NULL;
 
 	uint32_t i = 0, j = 0;
@@ -267,44 +267,44 @@ static int32_t create_metalog_mapping_table (struct f2fs_sb_info* sbi)
 	int32_t ret = 0;
 
 	/* get the geometry information */
-	ri->nr_mapping_phys_blks = NR_MAPPING_SECS * ri->blks_per_sec;
-	ri->nr_mapping_logi_blks = ri->nr_metalog_logi_blks / 1020;
-	if (ri->nr_metalog_logi_blks % 1020 != 0) {
-		ri->nr_mapping_logi_blks++;
+	ai->nr_mapping_phys_blks = NR_MAPPING_SECS * ai->blks_per_sec;
+	ai->nr_mapping_logi_blks = ai->nr_metalog_logi_blks / 1020;
+	if (ai->nr_metalog_logi_blks % 1020 != 0) {
+		ai->nr_mapping_logi_blks++;
 	}
 
 	f2fs_msg(sbi->sb, KERN_INFO, "--------------------------------");
-	f2fs_msg(sbi->sb, KERN_INFO, " # of mapping entries: %u", ri->nr_metalog_logi_blks);
-	f2fs_msg(sbi->sb, KERN_INFO, " * mapping table blkaddr: %u (blk)", ri->mapping_blkofs);
-	f2fs_msg(sbi->sb, KERN_INFO , " * mapping table length: %u (blk)", ri->nr_mapping_phys_blks);
+	f2fs_msg(sbi->sb, KERN_INFO, " # of mapping entries: %u", ai->nr_metalog_logi_blks);
+	f2fs_msg(sbi->sb, KERN_INFO, " * mapping table blkaddr: %u (blk)", ai->mapping_blkofs);
+	f2fs_msg(sbi->sb, KERN_INFO , " * mapping table length: %u (blk)", ai->nr_mapping_phys_blks);
 
 	/* allocate the memory space for the summary table */
-	if ((ri->map_blks = (struct alfs_map_blk*)kmalloc (
-			sizeof (struct alfs_map_blk) * ri->nr_mapping_logi_blks, GFP_KERNEL)) == NULL) {
+	if ((ai->map_blks = (struct alfs_map_blk*)kmalloc (
+			sizeof (struct alfs_map_blk) * ai->nr_mapping_logi_blks, GFP_KERNEL)) == NULL) {
 		f2fs_msg(sbi->sb, KERN_INFO, "Errors occur while allocating memory space for the mapping table");
 		goto out;
 	}
-	memset (ri->map_blks, 0x00, sizeof (struct alfs_map_blk) * ri->nr_mapping_logi_blks);
+	memset (ai->map_blks, 0x00, sizeof (struct alfs_map_blk) * ai->nr_mapping_logi_blks);
 
 	/* get the free page from the memory pool */
 	page = alloc_page (GFP_NOFS | __GFP_ZERO);
 	if (IS_ERR (page)) {
 		f2fs_msg(sbi->sb, KERN_INFO, "Errors occur while allocating page");
-		kfree (ri->map_blks);
+		kfree (ai->map_blks);
 		ret = PTR_ERR (page);
 		goto out;
 	}
 	lock_page (page);
 
 	/* read the mapping info from the disk */
-	ri->mapping_gc_sblkofs = -1;
-	ri->mapping_gc_eblkofs = -1;
+	ai->mapping_gc_sblkofs = -1;
+	ai->mapping_gc_eblkofs = -1;
 
 	/* read the mapping info from the disk */
 	for (i = 0; i < NR_MAPPING_SECS; i++) {
 		is_dead_section = 1;
 
-		for (j = 0; j < ri->blks_per_sec; j++) {
+		for (j = 0; j < ai->blks_per_sec; j++) {
 			__le32* ptr_page_addr = NULL;
 			struct alfs_map_blk* new_map_blk = NULL;
 			struct f2fs_bio_info *io;
@@ -312,7 +312,7 @@ static int32_t create_metalog_mapping_table (struct f2fs_sb_info* sbi)
 
 			/* read the mapping data from NAND devices */
 			down_read (&io->io_rwsem);
-			if (alfs_readpage_flash (sbi, page, ri->mapping_blkofs + (i * ri->blks_per_sec) + j) != 0) {
+			if (alfs_readpage_flash (sbi, page, ai->mapping_blkofs + (i * ai->blks_per_sec) + j) != 0) {
 				up_read (&io->io_rwsem);
 				f2fs_msg(sbi->sb, KERN_INFO, "Errors occur while reading the mapping data from NAND devices");
 				ret = -1;
@@ -327,8 +327,8 @@ static int32_t create_metalog_mapping_table (struct f2fs_sb_info* sbi)
 			/* check version # */
 			if (new_map_blk->magic == cpu_to_le32 (0xEF)) {
 				uint32_t index = le32_to_cpu (new_map_blk->index);
-				if (le32_to_cpu (ri->map_blks[index/1020].ver) <= le32_to_cpu (new_map_blk->ver)) {
-					memcpy (&ri->map_blks[index/1020], ptr_page_addr, F2FS_BLKSIZE);
+				if (le32_to_cpu (ai->map_blks[index/1020].ver) <= le32_to_cpu (new_map_blk->ver)) {
+					memcpy (&ai->map_blks[index/1020], ptr_page_addr, F2FS_BLKSIZE);
 					is_dead_section = 0; /* this section has a valid blk */
 				}
 			}
@@ -340,25 +340,25 @@ static int32_t create_metalog_mapping_table (struct f2fs_sb_info* sbi)
 		/* is it dead? */
 		if (is_dead_section == 1) {
 			f2fs_msg(sbi->sb, KERN_INFO, "dead section detected: %u\n", i);
-			if (ri->mapping_gc_eblkofs == -1 && ri->mapping_gc_sblkofs == -1) {
-				ri->mapping_gc_eblkofs = i * ri->blks_per_sec;
-				ri->mapping_gc_sblkofs = i * ri->blks_per_sec + ri->blks_per_sec;
-				ri->mapping_gc_sblkofs = ri->mapping_gc_sblkofs % ri->nr_mapping_phys_blks;
-				alfs_do_trim (sbi, ri->mapping_blkofs + ri->mapping_gc_eblkofs, ri->blks_per_sec); 
+			if (ai->mapping_gc_eblkofs == -1 && ai->mapping_gc_sblkofs == -1) {
+				ai->mapping_gc_eblkofs = i * ai->blks_per_sec;
+				ai->mapping_gc_sblkofs = i * ai->blks_per_sec + ai->blks_per_sec;
+				ai->mapping_gc_sblkofs = ai->mapping_gc_sblkofs % ai->nr_mapping_phys_blks;
+				alfs_do_trim (sbi, ai->mapping_blkofs + ai->mapping_gc_eblkofs, ai->blks_per_sec); 
 			}
 		}
 	}
 
 	/* is there a free section for the mapping table? */
-	if (ri->mapping_gc_sblkofs == -1 || ri->mapping_gc_eblkofs == -1) {
+	if (ai->mapping_gc_sblkofs == -1 || ai->mapping_gc_eblkofs == -1) {
 		f2fs_msg(sbi->sb, KERN_ERR, "[ERROR] oops! there is no free space for the mapping table");
 		ret = -1;
 	} else {
 		f2fs_msg(sbi->sb, KERN_INFO, "-------------------------------");
-		f2fs_msg(sbi->sb, KERN_INFO, "ri->mapping_gc_slbkofs: %u (%u)", 
-			ri->mapping_gc_sblkofs, ri->mapping_blkofs + ri->mapping_gc_sblkofs);
-		f2fs_msg(sbi->sb, KERN_INFO, "ri->mapping_gc_eblkofs: %u (%u)", 
-			ri->mapping_gc_eblkofs, ri->mapping_blkofs + ri->mapping_gc_eblkofs);
+		f2fs_msg(sbi->sb, KERN_INFO, "ai->mapping_gc_slbkofs: %u (%u)", 
+			ai->mapping_gc_sblkofs, ai->mapping_blkofs + ai->mapping_gc_sblkofs);
+		f2fs_msg(sbi->sb, KERN_INFO, "ai->mapping_gc_eblkofs: %u (%u)", 
+			ai->mapping_gc_eblkofs, ai->mapping_blkofs + ai->mapping_gc_eblkofs);
 		f2fs_msg(sbi->sb, KERN_INFO, "-------------------------------");
 	}
 
@@ -372,21 +372,21 @@ out:
 
 static int32_t create_metalog_summary_table (struct f2fs_sb_info* sbi)
 {
-	struct alfs_info* ri = ALFS_RI (sbi);
+	struct alfs_info* ai = ALFS_AI (sbi);
 	uint32_t sum_length = 0;
 	uint32_t i = 0, j = 0;
 	uint8_t is_dead = 1;
 	int32_t ret = 0;
 
 	/* get the geometry information */
-	sum_length = (sizeof (uint8_t) * ri->nr_metalog_phys_blks + F2FS_BLKSIZE - 1) / F2FS_BLKSIZE;
+	sum_length = (sizeof (uint8_t) * ai->nr_metalog_phys_blks + F2FS_BLKSIZE - 1) / F2FS_BLKSIZE;
 
 	f2fs_msg(sbi->sb, KERN_INFO, "--------------------------------");
 	f2fs_msg(sbi->sb, KERN_INFO, " * summary table length: %u", sum_length);
 	f2fs_msg(sbi->sb, KERN_INFO, "--------------------------------");
 
 	/* allocate the memory space for the summary table */
-	if ((ri->summary_table = 
+	if ((ai->summary_table = 
 			(uint8_t*)kmalloc (sum_length * F2FS_BLKSIZE, GFP_KERNEL)) == NULL) {
 		f2fs_msg(sbi->sb, KERN_ERR, "Errors occur while allocating memory space for the mapping table");
 		ret = -1;
@@ -394,34 +394,34 @@ static int32_t create_metalog_summary_table (struct f2fs_sb_info* sbi)
 	}
 
 	/* set all the entries of the summary table invalid */
-	memset (ri->summary_table, 2, sum_length * F2FS_BLKSIZE);
+	memset (ai->summary_table, 2, sum_length * F2FS_BLKSIZE);
 
 	/* set the entries which are vailid in the mapping valid */
-	for (i = 0; i < ri->nr_mapping_logi_blks; i++) {
+	for (i = 0; i < ai->nr_mapping_logi_blks; i++) {
 		for (j = 0; j < 1020; j++) {
-			__le32 phyofs = ri->map_blks[i].mapping[j];
+			__le32 phyofs = ai->map_blks[i].mapping[j];
 			if (le32_to_cpu (phyofs) != -1) {
-				ri->summary_table[le32_to_cpu (phyofs) - ri->metalog_blkofs] = 1;
+				ai->summary_table[le32_to_cpu (phyofs) - ai->metalog_blkofs] = 1;
 			}
 		}
 	}
 
 	/* search for a section that contains only invalid blks */
-	for (i = 0; i < ri->nr_metalog_phys_blks / ri->blks_per_sec; i++) {
+	for (i = 0; i < ai->nr_metalog_phys_blks / ai->blks_per_sec; i++) {
 		is_dead = 1;
-		for (j = 0; j < ri->blks_per_sec; j++) {
-			if (ri->summary_table[i*ri->blks_per_sec+j] != 2) {
+		for (j = 0; j < ai->blks_per_sec; j++) {
+			if (ai->summary_table[i*ai->blks_per_sec+j] != 2) {
 				is_dead = 0;
 				break;
 			}
 		}
 		if (is_dead == 1) {
-			ri->metalog_gc_eblkofs = i * ri->blks_per_sec;
-			ri->metalog_gc_sblkofs = i * ri->blks_per_sec;
-			ri->metalog_gc_sblkofs = (ri->metalog_gc_sblkofs + ri->blks_per_sec) % ri->nr_metalog_phys_blks;
+			ai->metalog_gc_eblkofs = i * ai->blks_per_sec;
+			ai->metalog_gc_sblkofs = i * ai->blks_per_sec;
+			ai->metalog_gc_sblkofs = (ai->metalog_gc_sblkofs + ai->blks_per_sec) % ai->nr_metalog_phys_blks;
 
-			alfs_do_trim (sbi, ri->mapping_blkofs + ri->metalog_gc_eblkofs, ri->blks_per_sec); 
-			memset (&ri->summary_table[i*ri->blks_per_sec], 0x00, ri->blks_per_sec);
+			alfs_do_trim (sbi, ai->mapping_blkofs + ai->metalog_gc_eblkofs, ai->blks_per_sec); 
+			memset (&ai->summary_table[i*ai->blks_per_sec], 0x00, ai->blks_per_sec);
 			break;
 		}
 	}
@@ -432,10 +432,10 @@ static int32_t create_metalog_summary_table (struct f2fs_sb_info* sbi)
 		ret = -1;
 	} else {
 		f2fs_msg(sbi->sb, KERN_INFO, "-------------------------------");
-		f2fs_msg(sbi->sb, KERN_INFO, "ri->metalog_gc_sblkofs: %u (%u)",
-			ri->metalog_gc_sblkofs, ri->metalog_blkofs + ri->metalog_gc_sblkofs);
-		f2fs_msg(sbi->sb, KERN_INFO, "ri->metalog_gc_eblkofs: %u (%u)",
-			ri->metalog_gc_eblkofs, ri->metalog_blkofs + ri->metalog_gc_eblkofs);
+		f2fs_msg(sbi->sb, KERN_INFO, "ai->metalog_gc_sblkofs: %u (%u)",
+			ai->metalog_gc_sblkofs, ai->metalog_blkofs + ai->metalog_gc_sblkofs);
+		f2fs_msg(sbi->sb, KERN_INFO, "ai->metalog_gc_eblkofs: %u (%u)",
+			ai->metalog_gc_eblkofs, ai->metalog_blkofs + ai->metalog_gc_eblkofs);
 		f2fs_msg(sbi->sb, KERN_INFO, "-------------------------------");
 	}
 
@@ -446,23 +446,24 @@ out:
 
 static void destroy_metalog_summary_table (struct f2fs_sb_info* sbi)
 {
-	struct alfs_info* ri = ALFS_RI (sbi);
-	if (ri->summary_table) {
-		kfree (ri->summary_table);
-		ri->summary_table = NULL;
+	struct alfs_info* ai = ALFS_AI (sbi);
+	if (ai->summary_table) {
+		kfree (ai->summary_table);
+		ai->summary_table = NULL;
 	}
 }
 
 static void destroy_metalog_mapping_table (struct f2fs_sb_info* sbi)
 {
-	struct alfs_info* ri = ALFS_RI (sbi);
-	if (ri->map_blks) {
-		kfree (ri->map_blks);
-		ri->map_blks = NULL;
+	struct alfs_info* ai = ALFS_AI (sbi);
+
+	if (ai->map_blks) {
+		kfree (ai->map_blks);
+		ai->map_blks = NULL;
 	}
 }
 
-static void destroy_ri (struct f2fs_sb_info* sbi)
+static void destroy_ai (struct f2fs_sb_info* sbi)
 {
 	if (sbi->ai) {
 		kfree (sbi->ai);
@@ -476,44 +477,44 @@ static void destroy_ri (struct f2fs_sb_info* sbi)
  */
 int32_t alfs_create_ai (struct f2fs_sb_info* sbi)
 {
-	struct alfs_info* ri = NULL;
+	struct alfs_info* ai = NULL;
 	uint32_t nr_logi_metalog_segments = 0;
 	uint32_t nr_phys_metalog_segments = 0;
 
 	/* create alfs_info structure */
-	if ((ri = (struct alfs_info*)kmalloc (
+	if ((ai = (struct alfs_info*)kmalloc (
 			sizeof (struct alfs_info), GFP_KERNEL)) == NULL) {
 		f2fs_msg(sbi->sb, KERN_INFO, "Errors occur while creating alfs_info");
 		return -1;
 	}
-	sbi->ai = ri;
+	sbi->ai = ai;
 
 	/* initialize some variables */
-	ri->mapping_blkofs = get_mapping_blkofs (sbi);
-	ri->metalog_blkofs = get_metalog_blkofs (sbi);
+	ai->mapping_blkofs = get_mapping_blkofs (sbi);
+	ai->metalog_blkofs = get_metalog_blkofs (sbi);
 
 	nr_logi_metalog_segments = get_nr_logi_meta_segments (sbi);
 	nr_phys_metalog_segments = get_nr_phys_meta_segments (sbi, nr_logi_metalog_segments);
 
-	ri->nr_metalog_logi_blks = SEGS2BLKS (sbi, nr_logi_metalog_segments);
-	ri->nr_metalog_phys_blks = SEGS2BLKS (sbi, nr_phys_metalog_segments);
+	ai->nr_metalog_logi_blks = SEGS2BLKS (sbi, nr_logi_metalog_segments);
+	ai->nr_metalog_phys_blks = SEGS2BLKS (sbi, nr_phys_metalog_segments);
 
-	ri->blks_per_sec = sbi->segs_per_sec * (1 << sbi->log_blocks_per_seg);
+	ai->blks_per_sec = sbi->segs_per_sec * (1 << sbi->log_blocks_per_seg);
 
 	/* create mutex for GC */
-	mutex_init(&ri->alfs_gc_mutex);
+	mutex_init(&ai->alfs_gc_mutex);
 
 	/* display information about metalog */
 	f2fs_msg(sbi->sb, KERN_INFO, "--------------------------------");
-	f2fs_msg(sbi->sb, KERN_INFO, " * mapping_blkofs: %u", ri->mapping_blkofs);
-	f2fs_msg(sbi->sb, KERN_INFO, " * metalog_blkofs: %u", ri->metalog_blkofs);
-	f2fs_msg(sbi->sb, KERN_INFO, " * # of blks per sec: %u", ri->blks_per_sec);
-	f2fs_msg(sbi->sb, KERN_INFO, " * # of logical meta-log blks: %u", ri->nr_metalog_logi_blks);
-	f2fs_msg(sbi->sb, KERN_INFO, " * # of physical meta-log blks: %u", ri->nr_metalog_phys_blks);
+	f2fs_msg(sbi->sb, KERN_INFO, " * mapping_blkofs: %u", ai->mapping_blkofs);
+	f2fs_msg(sbi->sb, KERN_INFO, " * metalog_blkofs: %u", ai->metalog_blkofs);
+	f2fs_msg(sbi->sb, KERN_INFO, " * # of blks per sec: %u", ai->blks_per_sec);
+	f2fs_msg(sbi->sb, KERN_INFO, " * # of logical meta-log blks: %u", ai->nr_metalog_logi_blks);
+	f2fs_msg(sbi->sb, KERN_INFO, " * # of physical meta-log blks: %u", ai->nr_metalog_phys_blks);
 	f2fs_msg(sbi->sb, KERN_INFO, " * the range of logical meta address: %u - %u", 
-		ri->metalog_blkofs, ri->metalog_blkofs + ri->nr_metalog_logi_blks);
+		ai->metalog_blkofs, ai->metalog_blkofs + ai->nr_metalog_logi_blks);
 	f2fs_msg(sbi->sb, KERN_INFO, " * the range of physical meta address: %u - %u", 
-		ri->metalog_blkofs, ri->metalog_blkofs + ri->nr_metalog_phys_blks);
+		ai->metalog_blkofs, ai->metalog_blkofs + ai->nr_metalog_phys_blks);
 
 	return 0;
 }
@@ -552,25 +553,24 @@ void alfs_destory_ai (struct f2fs_sb_info* sbi)
 {
 	destroy_metalog_summary_table (sbi);
 	destroy_metalog_mapping_table (sbi);
-	destroy_ri (sbi);
+	destroy_ai (sbi);
 }
-
 
 /*
  * mapping table management 
  */
 int32_t get_mapping_free_blks (struct f2fs_sb_info* sbi)
 {
-	struct alfs_info* ri = ALFS_RI (sbi);
+	struct alfs_info* ai = ALFS_AI (sbi);
 	uint32_t nr_free_blks;
 
-	if (ri->mapping_gc_sblkofs < ri->mapping_gc_eblkofs) {
-		nr_free_blks = ri->nr_mapping_phys_blks - ri->mapping_gc_eblkofs + ri->mapping_gc_sblkofs;
-	} else if (ri->mapping_gc_sblkofs > ri->mapping_gc_eblkofs) {
-		nr_free_blks = ri->mapping_gc_sblkofs - ri->mapping_gc_eblkofs;
+	if (ai->mapping_gc_sblkofs < ai->mapping_gc_eblkofs) {
+		nr_free_blks = ai->nr_mapping_phys_blks - ai->mapping_gc_eblkofs + ai->mapping_gc_sblkofs;
+	} else if (ai->mapping_gc_sblkofs > ai->mapping_gc_eblkofs) {
+		nr_free_blks = ai->mapping_gc_sblkofs - ai->mapping_gc_eblkofs;
 	} else {
-		f2fs_msg(sbi->sb, KERN_ERR, "[ERROR] 'ri->mapping_gc_sblkofs (%u)' is equal to 'ri->mapping_gc_eblkofs (%u)'", 
-			ri->mapping_gc_sblkofs, ri->mapping_gc_eblkofs);
+		f2fs_msg(sbi->sb, KERN_ERR, "[ERROR] 'ai->mapping_gc_sblkofs (%u)' is equal to 'ai->mapping_gc_eblkofs (%u)'", 
+			ai->mapping_gc_sblkofs, ai->mapping_gc_eblkofs);
 		nr_free_blks = -1;
 	}
 
@@ -587,21 +587,21 @@ int8_t is_mapping_gc_needed (struct f2fs_sb_info* sbi, int32_t nr_free_blks)
 
 int8_t alfs_do_mapping_gc (struct f2fs_sb_info* sbi)
 {
-	struct alfs_info* ri = ALFS_RI (sbi);
+	struct alfs_info* ai = ALFS_AI (sbi);
 
 	/* perform gc */
-	alfs_do_trim (sbi, ri->mapping_blkofs + ri->mapping_gc_sblkofs, ri->blks_per_sec); 
+	alfs_do_trim (sbi, ai->mapping_blkofs + ai->mapping_gc_sblkofs, ai->blks_per_sec); 
 
 	/* advance 'mapping_gc_sblkofs' */
-	ri->mapping_gc_sblkofs = (ri->mapping_gc_sblkofs + ri->blks_per_sec) % 
-		ri->nr_mapping_phys_blks;
+	ai->mapping_gc_sblkofs = (ai->mapping_gc_sblkofs + ai->blks_per_sec) % 
+		ai->nr_mapping_phys_blks;
 
 	return 0;
 }
 
 int32_t alfs_write_mapping_entries (struct f2fs_sb_info* sbi)
 {
-	struct alfs_info* ri = ALFS_RI (sbi);
+	struct alfs_info* ai = ALFS_AI (sbi);
 	struct page* page = NULL;
 	int32_t nr_free_blks = 0;
 	uint32_t i = 0;
@@ -615,19 +615,19 @@ int32_t alfs_write_mapping_entries (struct f2fs_sb_info* sbi)
 	/* TODO: see if there are any dirty mapping entries */
 
 	/* write dirty entries to the mapping area */
-	for (i = 0; i < ri->nr_mapping_logi_blks; i++) {
+	for (i = 0; i < ai->nr_mapping_logi_blks; i++) {
 		__le32* ptr_page_addr = NULL;
 		uint32_t version = 0;
 
 		/* see if it is dirty or not */
-		if (ri->map_blks[i].dirty == 0) {
+		if (ai->map_blks[i].dirty == 0) {
 			continue;
 		}
 
 		/* increase version numbers */
-		version = le32_to_cpu (ri->map_blks[i].ver) + 1;
-		ri->map_blks[i].ver = cpu_to_le32 (version);
-		ri->map_blks[i].dirty = cpu_to_le32 (0);
+		version = le32_to_cpu (ai->map_blks[i].ver) + 1;
+		ai->map_blks[i].ver = cpu_to_le32 (version);
+		ai->map_blks[i].dirty = cpu_to_le32 (0);
 
 		/* get the free page from the memory pool */
 		page = alloc_page (GFP_NOFS | __GFP_ZERO);
@@ -639,13 +639,13 @@ int32_t alfs_write_mapping_entries (struct f2fs_sb_info* sbi)
 
 		/* write dirty entires to NAND flash */
 		ptr_page_addr = (__le32*)page_address (page);
-		memcpy (ptr_page_addr, &ri->map_blks[i], F2FS_BLKSIZE);
+		memcpy (ptr_page_addr, &ai->map_blks[i], F2FS_BLKSIZE);
 
-		alfs_writepage_flash (sbi, page, ri->mapping_blkofs + ri->mapping_gc_eblkofs, 0);
+		alfs_writepage_flash (sbi, page, ai->mapping_blkofs + ai->mapping_gc_eblkofs, 0);
 
 		/* update physical location */
-		ri->mapping_gc_eblkofs = 
-			(ri->mapping_gc_eblkofs + 1) % ri->nr_mapping_phys_blks;
+		ai->mapping_gc_eblkofs = 
+			(ai->mapping_gc_eblkofs + 1) % ai->nr_mapping_phys_blks;
 	}
 
 	return 0;
@@ -658,13 +658,13 @@ int32_t alfs_write_mapping_entries (struct f2fs_sb_info* sbi)
 int32_t is_valid_meta_lblkaddr (struct f2fs_sb_info* sbi, 
 	block_t lblkaddr)
 {
-	struct alfs_info* ri = ALFS_RI (sbi);
+	struct alfs_info* ai = ALFS_AI (sbi);
 
 	if (sbi->ai == NULL)
 		return -1;
 	
-	if (lblkaddr >= ri->metalog_blkofs &&
-		lblkaddr < ri->metalog_blkofs + ri->nr_metalog_logi_blks)
+	if (lblkaddr >= ai->metalog_blkofs &&
+		lblkaddr < ai->metalog_blkofs + ai->nr_metalog_logi_blks)
 		return 0;
 
 	return -1;
@@ -672,13 +672,13 @@ int32_t is_valid_meta_lblkaddr (struct f2fs_sb_info* sbi,
 
 int32_t is_valid_meta_pblkaddr (struct f2fs_sb_info* sbi, block_t pblkaddr)
 {
-	struct alfs_info* ri = ALFS_RI (sbi);
+	struct alfs_info* ai = ALFS_AI (sbi);
 
 	if (sbi->ai == NULL)
 		return -1;
 	
-	if (pblkaddr >= ri->metalog_blkofs &&
-		pblkaddr < ri->metalog_blkofs + ri->nr_metalog_phys_blks)
+	if (pblkaddr >= ai->metalog_blkofs &&
+		pblkaddr < ai->metalog_blkofs + ai->nr_metalog_phys_blks)
 		return 0;
 
 	return -1;
@@ -686,16 +686,16 @@ int32_t is_valid_meta_pblkaddr (struct f2fs_sb_info* sbi, block_t pblkaddr)
 
 int32_t get_metalog_free_blks (struct f2fs_sb_info* sbi)
 {
-	struct alfs_info* ri = ALFS_RI (sbi);
+	struct alfs_info* ai = ALFS_AI (sbi);
 	uint32_t nr_free_blks;
 
-	if (ri->metalog_gc_sblkofs < ri->metalog_gc_eblkofs) {
-		nr_free_blks = ri->nr_metalog_phys_blks - ri->metalog_gc_eblkofs + ri->metalog_gc_sblkofs;
-	} else if (ri->metalog_gc_sblkofs > ri->metalog_gc_eblkofs) {
-		nr_free_blks = ri->metalog_gc_sblkofs - ri->metalog_gc_eblkofs;
+	if (ai->metalog_gc_sblkofs < ai->metalog_gc_eblkofs) {
+		nr_free_blks = ai->nr_metalog_phys_blks - ai->metalog_gc_eblkofs + ai->metalog_gc_sblkofs;
+	} else if (ai->metalog_gc_sblkofs > ai->metalog_gc_eblkofs) {
+		nr_free_blks = ai->metalog_gc_sblkofs - ai->metalog_gc_eblkofs;
 	} else {
-		f2fs_msg(sbi->sb, KERN_ERR, "[ERROR] 'ri->metalog_gc_sblkofs (%u)' is equal to 'ri->metalog_gc_eblkofs (%u)'", 
-			ri->metalog_gc_sblkofs, ri->metalog_gc_eblkofs);
+		f2fs_msg(sbi->sb, KERN_ERR, "[ERROR] 'ai->metalog_gc_sblkofs (%u)' is equal to 'ai->metalog_gc_eblkofs (%u)'", 
+			ai->metalog_gc_sblkofs, ai->metalog_gc_eblkofs);
 		nr_free_blks = -1;
 	}
 
@@ -704,21 +704,21 @@ int32_t get_metalog_free_blks (struct f2fs_sb_info* sbi)
 
 int8_t is_gc_needed (struct f2fs_sb_info* sbi, int32_t nr_free_blks)
 {
-	struct alfs_info* ri = ALFS_RI (sbi);
+	struct alfs_info* ai = ALFS_AI (sbi);
 
-	mutex_lock (&ri->alfs_gc_mutex); 
+	mutex_lock (&ai->alfs_gc_mutex); 
 	if (nr_free_blks <= (sbi->segs_per_sec * sbi->blocks_per_seg)) {
-		mutex_unlock (&ri->alfs_gc_mutex); 
+		mutex_unlock (&ai->alfs_gc_mutex); 
 		return 0;
 	}
 
-	mutex_unlock (&ri->alfs_gc_mutex); 
+	mutex_unlock (&ai->alfs_gc_mutex); 
 	return -1;
 }
 
 uint32_t alfs_get_mapped_pblkaddr (struct f2fs_sb_info* sbi, block_t lblkaddr)
 {
-	struct alfs_info* ri = ALFS_RI (sbi);
+	struct alfs_info* ai = ALFS_AI (sbi);
 	block_t pblkaddr;
 	block_t new_lblkaddr;
 
@@ -727,8 +727,8 @@ uint32_t alfs_get_mapped_pblkaddr (struct f2fs_sb_info* sbi, block_t lblkaddr)
 		return NULL_ADDR;
 
 	/* get the physical blkaddr from the mapping table */
-	new_lblkaddr = lblkaddr - ri->metalog_blkofs;
-	pblkaddr = le32_to_cpu (ri->map_blks[new_lblkaddr/1020].mapping[new_lblkaddr%1020]);
+	new_lblkaddr = lblkaddr - ai->metalog_blkofs;
+	pblkaddr = le32_to_cpu (ai->map_blks[new_lblkaddr/1020].mapping[new_lblkaddr%1020]);
 	if (pblkaddr == -1)
 		pblkaddr = 0;
 
@@ -736,19 +736,19 @@ uint32_t alfs_get_mapped_pblkaddr (struct f2fs_sb_info* sbi, block_t lblkaddr)
 	if (is_valid_meta_pblkaddr (sbi, pblkaddr) == -1) {
 		if (pblkaddr != NULL_ADDR) {
 			f2fs_msg(sbi->sb, KERN_ERR, "invalid pblkaddr: (%llu (=%llu-%llu) => %u)", 
-				(int64_t)lblkaddr - (int64_t)ri->metalog_blkofs,
+				(int64_t)lblkaddr - (int64_t)ai->metalog_blkofs,
 				(int64_t)lblkaddr, 
-				(int64_t)ri->metalog_blkofs, 
+				(int64_t)ai->metalog_blkofs, 
 				pblkaddr);
 		}
 		return NULL_ADDR;
 	}
 
 	/* see if the summary table is correct or not */
-	if (ri->summary_table[pblkaddr - ri->metalog_blkofs] == 0 ||
-		ri->summary_table[pblkaddr - ri->metalog_blkofs] == 2) {
+	if (ai->summary_table[pblkaddr - ai->metalog_blkofs] == 0 ||
+		ai->summary_table[pblkaddr - ai->metalog_blkofs] == 2) {
 		f2fs_msg(sbi->sb, KERN_ERR, "the summary table is incorrect: pblkaddr=%u (%u)",
-			pblkaddr, ri->summary_table[pblkaddr - ri->metalog_blkofs]);
+			pblkaddr, ai->summary_table[pblkaddr - ai->metalog_blkofs]);
 	}
 
 	return pblkaddr;
@@ -756,7 +756,7 @@ uint32_t alfs_get_mapped_pblkaddr (struct f2fs_sb_info* sbi, block_t lblkaddr)
 
 uint32_t alfs_get_new_pblkaddr (struct f2fs_sb_info* sbi, block_t lblkaddr, uint32_t length)
 {
-	struct alfs_info* ri = ALFS_RI (sbi);
+	struct alfs_info* ai = ALFS_AI (sbi);
 	block_t pblkaddr = NULL_ADDR;
 
 	/* see if ri is initialized or not */
@@ -764,9 +764,9 @@ uint32_t alfs_get_new_pblkaddr (struct f2fs_sb_info* sbi, block_t lblkaddr, uint
 		return NULL_ADDR;
 
 	/* have sufficent free blks - go ahead */
-	if (ri->summary_table[ri->metalog_gc_eblkofs] == 0) {
+	if (ai->summary_table[ai->metalog_gc_eblkofs] == 0) {
 		/* get the physical blkoff */
-		pblkaddr = ri->metalog_blkofs + ri->metalog_gc_eblkofs;
+		pblkaddr = ai->metalog_blkofs + ai->metalog_gc_eblkofs;
 
 		/* see if pblk is valid or not */
 		if (is_valid_meta_pblkaddr (sbi, pblkaddr) == -1) {
@@ -775,7 +775,7 @@ uint32_t alfs_get_new_pblkaddr (struct f2fs_sb_info* sbi, block_t lblkaddr, uint
 		}
 	} else {
 		f2fs_msg(sbi->sb, KERN_ERR, "metalog_gc_eblkofs is NOT free: summary_table[%u] = %u",
-			ri->metalog_gc_eblkofs, ri->summary_table[ri->metalog_gc_eblkofs]);
+			ai->metalog_gc_eblkofs, ai->summary_table[ai->metalog_gc_eblkofs]);
 		return NULL_ADDR;
 	}
 
@@ -784,7 +784,7 @@ uint32_t alfs_get_new_pblkaddr (struct f2fs_sb_info* sbi, block_t lblkaddr, uint
 
 int8_t alfs_map_l2p (struct f2fs_sb_info* sbi, block_t lblkaddr, block_t pblkaddr, uint32_t length)
 {
-	struct alfs_info* ri = ALFS_RI (sbi);
+	struct alfs_info* ai = ALFS_AI (sbi);
 	block_t cur_lblkaddr = lblkaddr;
 	block_t cur_pblkaddr = pblkaddr;
 	block_t new_lblkaddr;
@@ -816,15 +816,15 @@ int8_t alfs_map_l2p (struct f2fs_sb_info* sbi, block_t lblkaddr, block_t pblkadd
 		}
 
 		/* get the old pblkaddr */
-		new_lblkaddr = cur_lblkaddr - ri->metalog_blkofs;
-		prev_pblkaddr = le32_to_cpu (ri->map_blks[new_lblkaddr/1020].mapping[new_lblkaddr%1020]);
+		new_lblkaddr = cur_lblkaddr - ai->metalog_blkofs;
+		prev_pblkaddr = le32_to_cpu (ai->map_blks[new_lblkaddr/1020].mapping[new_lblkaddr%1020]);
 		if (prev_pblkaddr == -1)
 			prev_pblkaddr = 0;
 
 		/* see if 'prev_pblkaddr' is valid or not */
 		if (is_valid_meta_pblkaddr (sbi, prev_pblkaddr) == 0) {
 			/* make the entry of the summary table invalid */
-			ri->summary_table[prev_pblkaddr - ri->metalog_blkofs] = 2;	/* set to invalid */
+			ai->summary_table[prev_pblkaddr - ai->metalog_blkofs] = 2;	/* set to invalid */
 
 			/* trim */
 			if (alfs_do_trim (sbi, prev_pblkaddr, 1) == -1) {
@@ -837,14 +837,14 @@ int8_t alfs_map_l2p (struct f2fs_sb_info* sbi, block_t lblkaddr, block_t pblkadd
 		}
 
 		/* update the mapping & summary table */
-		new_lblkaddr = cur_lblkaddr - ri->metalog_blkofs;
-		ri->map_blks[new_lblkaddr/1020].mapping[new_lblkaddr%1020] = cpu_to_le32 (cur_pblkaddr);
-		ri->map_blks[new_lblkaddr/1020].dirty = 1;
+		new_lblkaddr = cur_lblkaddr - ai->metalog_blkofs;
+		ai->map_blks[new_lblkaddr/1020].mapping[new_lblkaddr%1020] = cpu_to_le32 (cur_pblkaddr);
+		ai->map_blks[new_lblkaddr/1020].dirty = 1;
 
-		ri->summary_table[cur_pblkaddr - ri->metalog_blkofs] = 1; /* set to valid */
+		ai->summary_table[cur_pblkaddr - ai->metalog_blkofs] = 1; /* set to valid */
 
 		/* adjust end_blkofs in the meta-log */
-		ri->metalog_gc_eblkofs = (ri->metalog_gc_eblkofs + 1) % (ri->nr_metalog_phys_blks);
+		ai->metalog_gc_eblkofs = (ai->metalog_gc_eblkofs + 1) % (ai->nr_metalog_phys_blks);
 
 		/* go to the next logical blkaddr */
 		cur_lblkaddr++;
@@ -870,31 +870,31 @@ int8_t alfs_do_trim (struct f2fs_sb_info* sbi, block_t pblkaddr, uint32_t nr_blk
 
 int8_t alfs_do_gc (struct f2fs_sb_info* sbi)
 {
-	struct alfs_info* ri = ALFS_RI (sbi);
+	struct alfs_info* ai = ALFS_AI (sbi);
 	struct page* page = NULL;
 
 	uint32_t cur_blkofs = 0;
 	uint32_t loop = 0;
 
-	mutex_lock (&ri->alfs_gc_mutex); 
+	mutex_lock (&ai->alfs_gc_mutex); 
 
 	/* see if ri is initialized or not */
 	if (sbi->ai == NULL) {
-		mutex_unlock(&ri->alfs_gc_mutex); 
+		mutex_unlock(&ai->alfs_gc_mutex); 
 		return -1;
 	}
 
 	/* check the alignment */
-	if (ri->metalog_gc_sblkofs % (sbi->segs_per_sec * sbi->blocks_per_seg) != 0) {
-		f2fs_msg(sbi->sb, KERN_ERR, "ri->metalog_gc_sblkofs %% sbi->blocks_per_seg != 0 (%u)", 
-			ri->metalog_gc_sblkofs % (sbi->segs_per_sec * sbi->blocks_per_seg));
-		mutex_unlock(&ri->alfs_gc_mutex); 
+	if (ai->metalog_gc_sblkofs % (sbi->segs_per_sec * sbi->blocks_per_seg) != 0) {
+		f2fs_msg(sbi->sb, KERN_ERR, "ai->metalog_gc_sblkofs %% sbi->blocks_per_seg != 0 (%u)", 
+			ai->metalog_gc_sblkofs % (sbi->segs_per_sec * sbi->blocks_per_seg));
+		mutex_unlock(&ai->alfs_gc_mutex); 
 		return -1;
 	}
 
 	/* read all valid blks in the victim segment */
-	for (cur_blkofs = ri->metalog_gc_sblkofs; 
-		 cur_blkofs < ri->metalog_gc_sblkofs + (sbi->segs_per_sec * sbi->blocks_per_seg); 
+	for (cur_blkofs = ai->metalog_gc_sblkofs; 
+		 cur_blkofs < ai->metalog_gc_sblkofs + (sbi->segs_per_sec * sbi->blocks_per_seg); 
 		 cur_blkofs++) 
 	{
 		uint8_t is_mapped = 0;
@@ -902,9 +902,9 @@ int8_t alfs_do_gc (struct f2fs_sb_info* sbi)
 		uint32_t dst_pblkaddr;
 
 		/* see if the block is valid or not */
-		if (ri->summary_table[cur_blkofs] == 0 || ri->summary_table[cur_blkofs] == 2) {
+		if (ai->summary_table[cur_blkofs] == 0 || ai->summary_table[cur_blkofs] == 2) {
 			/* go to the next blks */
-			ri->summary_table[cur_blkofs] = cpu_to_le32 (0); /* set to free */
+			ai->summary_table[cur_blkofs] = cpu_to_le32 (0); /* set to free */
 
 			continue;
 		}
@@ -913,14 +913,14 @@ int8_t alfs_do_gc (struct f2fs_sb_info* sbi)
 		page = alloc_page (GFP_NOFS | __GFP_ZERO);
 		if (IS_ERR (page)) {
 			f2fs_msg(sbi->sb, KERN_INFO, "page is invalid");
-			mutex_unlock(&ri->alfs_gc_mutex); 
+			mutex_unlock(&ai->alfs_gc_mutex); 
 			return PTR_ERR (page);
 		}
 		lock_page (page);
 
 		/* determine src & dst blks */
-		src_pblkaddr = ri->metalog_blkofs + cur_blkofs;
-		dst_pblkaddr = ri->metalog_blkofs + ri->metalog_gc_eblkofs;
+		src_pblkaddr = ai->metalog_blkofs + cur_blkofs;
+		dst_pblkaddr = ai->metalog_blkofs + ai->metalog_gc_eblkofs;
 
 		/* read the valid blk into the page */
 		if (alfs_readpage (sbi, page, src_pblkaddr) == -1) {
@@ -941,10 +941,10 @@ int8_t alfs_do_gc (struct f2fs_sb_info* sbi)
 		}
 
 		/* update mapping table */
-		for (loop = 0; loop < ri->nr_metalog_logi_blks; loop++) {
-			if (ri->map_blks[loop/1020].mapping[loop%1020] == src_pblkaddr) {
-				ri->map_blks[loop/1020].mapping[loop%1020] = dst_pblkaddr;
-				ri->map_blks[loop/1020].dirty = 1;
+		for (loop = 0; loop < ai->nr_metalog_logi_blks; loop++) {
+			if (ai->map_blks[loop/1020].mapping[loop%1020] == src_pblkaddr) {
+				ai->map_blks[loop/1020].mapping[loop%1020] = dst_pblkaddr;
+				ai->map_blks[loop/1020].dirty = 1;
 				is_mapped = 1;
 				break;
 			}
@@ -955,27 +955,27 @@ int8_t alfs_do_gc (struct f2fs_sb_info* sbi)
 		}
 
 		/* update summary table */
-		ri->summary_table[src_pblkaddr - ri->metalog_blkofs] = cpu_to_le32 (0); /* set to free */
-		ri->summary_table[dst_pblkaddr - ri->metalog_blkofs] = cpu_to_le32 (1); /* see to valid */
+		ai->summary_table[src_pblkaddr - ai->metalog_blkofs] = cpu_to_le32 (0); /* set to free */
+		ai->summary_table[dst_pblkaddr - ai->metalog_blkofs] = cpu_to_le32 (1); /* see to valid */
 
 		/* update end offset */
-		ri->metalog_gc_eblkofs = (ri->metalog_gc_eblkofs + 1) % ri->nr_metalog_phys_blks;
+		ai->metalog_gc_eblkofs = (ai->metalog_gc_eblkofs + 1) % ai->nr_metalog_phys_blks;
 
 	}
-	if (alfs_do_trim (sbi, ri->metalog_blkofs , ri->blks_per_sec) == -1) {
+	if (alfs_do_trim (sbi, ai->metalog_blkofs , ai->blks_per_sec) == -1) {
 		f2fs_msg(sbi->sb, KERN_ERR, "Errors occur while trimming the page during GC");
 	}
 
-	if (alfs_do_trim (sbi, ri->metalog_blkofs , ri->blks_per_sec) == -1) {
+	if (alfs_do_trim (sbi, ai->metalog_blkofs , ai->blks_per_sec) == -1) {
 		f2fs_msg(sbi->sb, KERN_ERR, "Errors occur while trimming the page during GC");
 	}
 
 	/* update start offset */
-	ri->metalog_gc_sblkofs = 
-		(ri->metalog_gc_sblkofs + (sbi->segs_per_sec * sbi->blocks_per_seg)) % 
-		ri->nr_metalog_phys_blks;
+	ai->metalog_gc_sblkofs = 
+		(ai->metalog_gc_sblkofs + (sbi->segs_per_sec * sbi->blocks_per_seg)) % 
+		ai->nr_metalog_phys_blks;
 
-	mutex_unlock (&ri->alfs_gc_mutex); 
+	mutex_unlock (&ai->alfs_gc_mutex); 
 
 	return 0;
 }
