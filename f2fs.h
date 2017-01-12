@@ -910,6 +910,12 @@ struct f2fs_sb_info {
 	/* Reference to checksum algorithm driver via cryptoapi */
 	struct crypto_shash *s_chksum_driver;
 
+	/* For ALFS extension management */
+#ifdef ALFS_SNAPSHOT
+	struct alfs_info *ai;
+	spinlock_t mapping_lock;	/* lock for stat operations */
+#endif
+
 	/* For fault injection */
 #ifdef CONFIG_F2FS_FAULT_INJECTION
 	struct f2fs_fault_info fault_info;
