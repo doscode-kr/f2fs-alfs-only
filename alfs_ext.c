@@ -272,8 +272,9 @@ static int32_t create_metalog_mapping_table(struct f2fs_sb_info *sbi)
 	f2fs_msg(sbi->sb, KERN_INFO, " * mapping table length: %u (blk)", ai->nr_mapping_phys_blks);
 
 	/* allocate the memory space for the summary table */
-	if ((ai->map_blks = (struct alfs_map_blk *)kmalloc(
-		sizeof(struct alfs_map_blk) * ai->nr_mapping_logi_blks, GFP_KERNEL)) == NULL) {
+	ai->map_blks = kmalloc(sizeof(struct alfs_map_blk) * ai->nr_mapping_logi_blks,
+				GFP_KERNEL);
+	if (ai->map_blks == NULL) {
 		f2fs_msg(sbi->sb, KERN_INFO, "Errors occur while allocating memory space for the mapping table");
 		goto out;
 	}
@@ -379,8 +380,8 @@ static int32_t create_metalog_summary_table(struct f2fs_sb_info *sbi)
 	f2fs_msg(sbi->sb, KERN_INFO, "--------------------------------");
 
 	/* allocate the memory space for the summary table */
-	if ((ai->summary_table =
-			(uint8_t *)kmalloc(sum_length * F2FS_BLKSIZE, GFP_KERNEL)) == NULL) {
+	ai->summary_table = kmalloc(sum_length * F2FS_BLKSIZE, GFP_KERNEL);
+	if (ai->summary_table == NULL) {
 		f2fs_msg(sbi->sb, KERN_ERR, "Errors occur while allocating memory space for the mapping table");
 		ret = -1;
 		goto out;
@@ -475,8 +476,8 @@ int32_t alfs_create_ai(struct f2fs_sb_info *sbi)
 	uint32_t nr_phys_metalog_segments = 0;
 
 	/* create alfs_info structure */
-	if ((ai = (struct alfs_info *)kmalloc(
-			sizeof(struct alfs_info), GFP_KERNEL)) == NULL) {
+	ai = kmalloc(sizeof(struct alfs_info), GFP_KERNEL);
+	if (ai == NULL) {
 		f2fs_msg(sbi->sb, KERN_INFO, "Errors occur while creating alfs_info");
 		return -1;
 	}
@@ -801,7 +802,8 @@ int8_t alfs_map_l2p(struct f2fs_sb_info *sbi, block_t lblkaddr, block_t pblkaddr
 
 		/* get the new pblkaddr */
 		if (cur_pblkaddr == NULL_ADDR) {
-			if ((cur_pblkaddr = alfs_get_new_pblkaddr(sbi, cur_lblkaddr, length)) == NULL_ADDR) {
+			cur_pblkaddr = alfs_get_new_pblkaddr(sbi, cur_lblkaddr, length);
+			if (cur_pblkaddr == NULL_ADDR) {
 				f2fs_msg(sbi->sb, KERN_ERR, "cannot get the new free block (cur_lblkaddr: %u)", cur_lblkaddr);
 				return -1;
 			}
