@@ -23,6 +23,10 @@
 #include "gc.h"
 #include <trace/events/f2fs.h>
 
+#ifdef ALFS_TRIM
+#include "alfs_ext.h"
+#endif
+
 static int gc_thread_func(void *data)
 {
 	struct f2fs_sb_info *sbi = data;
@@ -100,7 +104,7 @@ int start_gc_thread(struct f2fs_sb_info *sbi)
 	struct f2fs_gc_kthread *gc_th;
 	dev_t dev = sbi->sb->s_bdev->bd_dev;
 	int err = 0;
-	
+
 	gc_th = f2fs_kmalloc(sbi, sizeof(struct f2fs_gc_kthread), GFP_KERNEL);
 	if (!gc_th) {
 		err = -ENOMEM;
@@ -892,6 +896,10 @@ next:
 		f2fs_put_page(sum_page, 0);
 	}
 
+#ifdef ALFS_TRIM
+		alfs_do_trim (sbi, START_BLOCK (sbi, start_segno),
+						sbi->ai->blks_per_sec);
+#endif
 	if (gc_type == FG_GC)
 		f2fs_submit_merged_bio(sbi,
 				(type == SUM_TYPE_NODE) ? NODE : DATA, WRITE);
