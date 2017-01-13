@@ -24,12 +24,12 @@ void f2fs_write_end_io(struct bio *bio);
 static void alfs_end_io_flash (struct bio *bio)
 {
 	struct alfs_bio_private *p = NULL;
-	if (bio){
+	if (bio) {
 		__u32 read_size = 0;
 		sector_t read_sector = bio->bi_iter.bi_sector;
 		struct bio_vec *v;
 
-		for(v = bio->bi_io_vec; v < &bio->bi_io_vec[bio->bi_iter.bi_idx]; ++v)
+		for (v = bio->bi_io_vec; v < &bio->bi_io_vec[bio->bi_iter.bi_idx]; ++v)
 		{
 			read_sector -= v->bv_len / 512;
 			read_size += v->bv_len;
@@ -37,7 +37,7 @@ static void alfs_end_io_flash (struct bio *bio)
 		// dm_robusta_end_io()에서 읽어온 4k bio의 sector는 NVME_LBA를 의미한다
 
 		p = bio->bi_private;
-		if(p){
+		if (p) {
 			if (p->page) {
 				ClearPageUptodate (p->page);
 				unlock_page (p->page);
@@ -145,10 +145,9 @@ retry:
 		p->is_sync = false;
 	}
 
-	if (test_opt(sbi, NOBARRIER)){
+	if (test_opt(sbi, NOBARRIER)) {
 		bio_set_op_attrs(bio, REQ_OP_WRITE, REQ_PREFLUSH | REQ_META | REQ_PRIO);
-	}
-	else{
+	} else {
 		bio_set_op_attrs(bio, REQ_OP_WRITE, REQ_PREFLUSH | REQ_META | REQ_PRIO | REQ_FUA);
 	}
 
@@ -176,10 +175,9 @@ static struct bio *get_new_bio(struct f2fs_sb_info *sbi, int npages)
 	bio->bi_end_io = alfs_end_io_flash;
 	bio->bi_bdev = sbi->sb->s_bdev;
 
-	if(test_opt(sbi, NOBARRIER)){
+	if (test_opt(sbi, NOBARRIER)) {
 		bio_set_op_attrs(bio, REQ_OP_WRITE, REQ_PREFLUSH | REQ_META | REQ_PRIO);
-	}
-	else{
+	} else{
 		bio_set_op_attrs(bio, REQ_OP_WRITE, REQ_PREFLUSH | REQ_META | REQ_PRIO | REQ_FUA);
 	}
 	return bio;
@@ -272,7 +270,7 @@ static int32_t create_metalog_mapping_table (struct f2fs_sb_info *sbi)
 	f2fs_msg(sbi->sb, KERN_INFO, "--------------------------------");
 	f2fs_msg(sbi->sb, KERN_INFO, " # of mapping entries: %u", ai->nr_metalog_logi_blks);
 	f2fs_msg(sbi->sb, KERN_INFO, " * mapping table blkaddr: %u (blk)", ai->mapping_blkofs);
-	f2fs_msg(sbi->sb, KERN_INFO , " * mapping table length: %u (blk)", ai->nr_mapping_phys_blks);
+	f2fs_msg(sbi->sb, KERN_INFO, " * mapping table length: %u (blk)", ai->nr_mapping_phys_blks);
 
 	/* allocate the memory space for the summary table */
 	if ((ai->map_blks = (struct alfs_map_blk *)kmalloc (
@@ -957,11 +955,11 @@ int8_t alfs_do_gc (struct f2fs_sb_info *sbi)
 		ai->metalog_gc_eblkofs = (ai->metalog_gc_eblkofs + 1) % ai->nr_metalog_phys_blks;
 
 	}
-	if (alfs_do_trim (sbi, ai->metalog_blkofs , ai->blks_per_sec) == -1) {
+	if (alfs_do_trim (sbi, ai->metalog_blkofs, ai->blks_per_sec) == -1) {
 		f2fs_msg(sbi->sb, KERN_ERR, "Errors occur while trimming the page during GC");
 	}
 
-	if (alfs_do_trim (sbi, ai->metalog_blkofs , ai->blks_per_sec) == -1) {
+	if (alfs_do_trim (sbi, ai->metalog_blkofs, ai->blks_per_sec) == -1) {
 		f2fs_msg(sbi->sb, KERN_ERR, "Errors occur while trimming the page during GC");
 	}
 
@@ -1108,7 +1106,7 @@ void alfs_submit_merged_bio_w (struct f2fs_sb_info *sbi, struct bio *bio, uint8_
 
 		memcpy (dst_page_addr, src_page_addr, PAGE_SIZE);
 
-		if (bioloop == 0 )
+		if (bioloop == 0)
 		{
 			new_bio->bi_iter.bi_sector = SECTOR_FROM_BLOCK (pblkaddr);
 		}
