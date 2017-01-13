@@ -27,7 +27,7 @@ static void alfs_end_io_flash (struct bio *bio)
 	if (bio){
 		__u32 read_size = 0;
 		sector_t read_sector = bio->bi_iter.bi_sector;
-		struct bio_vec* v;
+		struct bio_vec *v;
 
 		for(v = bio->bi_io_vec; v < &bio->bi_io_vec[bio->bi_iter.bi_idx]; ++v)
 		{
@@ -53,11 +53,11 @@ static void alfs_end_io_flash (struct bio *bio)
 	}
 }
 
-static int32_t alfs_readpage_flash (struct f2fs_sb_info *sbi, struct page* page, block_t blkaddr)
+static int32_t alfs_readpage_flash (struct f2fs_sb_info *sbi, struct page *page, block_t blkaddr)
 {
-	//struct block_device* bdev = sbi->sb->s_bdev;
-	struct bio* bio = NULL;
-	struct alfs_bio_private* p = NULL;
+	//struct block_device *bdev = sbi->sb->s_bdev;
+	struct bio *bio = NULL;
+	struct alfs_bio_private *p = NULL;
 
 	DECLARE_COMPLETION_ONSTACK (wait);
 
@@ -102,11 +102,11 @@ retry:
 	return 0;
 }
 
-static int32_t alfs_writepage_flash (struct f2fs_sb_info *sbi, struct page* page, block_t blkaddr, uint8_t sync)
+static int32_t alfs_writepage_flash (struct f2fs_sb_info *sbi, struct page *page, block_t blkaddr, uint8_t sync)
 {
-	//struct block_device* bdev = sbi->sb->s_bdev;
-	struct bio* bio = NULL;
-	struct alfs_bio_private* p = NULL;
+	//struct block_device *bdev = sbi->sb->s_bdev;
+	struct bio *bio = NULL;
+	struct alfs_bio_private *p = NULL;
 	DECLARE_COMPLETION_ONSTACK (wait);
 
 retry:
@@ -164,10 +164,10 @@ retry:
 	return 0;
 }
 
-static struct bio* get_new_bio(struct f2fs_sb_info *sbi, int npages)
+static struct bio *get_new_bio(struct f2fs_sb_info *sbi, int npages)
 {
 	/* allocate a new bio */
-	struct bio* bio = NULL;
+	struct bio *bio = NULL;
 	bio = f2fs_bio_alloc (npages);
 
 	/* initialize the bio */
@@ -185,11 +185,11 @@ static struct bio* get_new_bio(struct f2fs_sb_info *sbi, int npages)
 	return bio;
 }
 
-static int32_t alfs_write_bio_flash (struct f2fs_sb_info *sbi, struct bio* bio, uint8_t sync)
+static int32_t alfs_write_bio_flash (struct f2fs_sb_info *sbi, struct bio *bio, uint8_t sync)
 {
-	//struct block_device* bdev = sbi->sb->s_bdev;
-	struct alfs_bio_private* p = NULL;
-	struct bio_vec* v;
+	//struct block_device *bdev = sbi->sb->s_bdev;
+	struct alfs_bio_private *p = NULL;
+	struct bio_vec *v;
 	DECLARE_COMPLETION_ONSTACK (wait);
 
 retry:
@@ -226,7 +226,7 @@ retry:
 
 
 
-int8_t alfs_readpage (struct f2fs_sb_info* sbi, struct page* page, block_t pblkaddr)
+int8_t alfs_readpage (struct f2fs_sb_info *sbi, struct page *page, block_t pblkaddr)
 {
 	int8_t ret;
 	struct f2fs_bio_info *io;
@@ -238,7 +238,7 @@ int8_t alfs_readpage (struct f2fs_sb_info* sbi, struct page* page, block_t pblka
 	return ret;
 }
 
-int8_t alfs_writepage(struct f2fs_sb_info* sbi, struct page* page, block_t pblkaddr, uint8_t sync)
+int8_t alfs_writepage(struct f2fs_sb_info *sbi, struct page *page, block_t pblkaddr, uint8_t sync)
 {
 	int8_t ret;
 	struct f2fs_bio_info *io;
@@ -253,10 +253,10 @@ int8_t alfs_writepage(struct f2fs_sb_info* sbi, struct page* page, block_t pblka
 /*
  * Create mapping & summary tables
  */
-static int32_t create_metalog_mapping_table (struct f2fs_sb_info* sbi)
+static int32_t create_metalog_mapping_table (struct f2fs_sb_info *sbi)
 {
-	struct alfs_info* ai = ALFS_AI (sbi);
-	struct page* page = NULL;
+	struct alfs_info *ai = ALFS_AI (sbi);
+	struct page *page = NULL;
 
 	uint32_t i = 0, j = 0;
 	uint8_t is_dead_section = 1;
@@ -275,7 +275,7 @@ static int32_t create_metalog_mapping_table (struct f2fs_sb_info* sbi)
 	f2fs_msg(sbi->sb, KERN_INFO , " * mapping table length: %u (blk)", ai->nr_mapping_phys_blks);
 
 	/* allocate the memory space for the summary table */
-	if ((ai->map_blks = (struct alfs_map_blk*)kmalloc (
+	if ((ai->map_blks = (struct alfs_map_blk *)kmalloc (
 			sizeof (struct alfs_map_blk) * ai->nr_mapping_logi_blks, GFP_KERNEL)) == NULL) {
 		f2fs_msg(sbi->sb, KERN_INFO, "Errors occur while allocating memory space for the mapping table");
 		goto out;
@@ -301,8 +301,8 @@ static int32_t create_metalog_mapping_table (struct f2fs_sb_info* sbi)
 		is_dead_section = 1;
 
 		for (j = 0; j < ai->blks_per_sec; j++) {
-			__le32* ptr_page_addr = NULL;
-			struct alfs_map_blk* new_map_blk = NULL;
+			__le32 *ptr_page_addr = NULL;
+			struct alfs_map_blk *new_map_blk = NULL;
 			struct f2fs_bio_info *io;
 			io = &sbi->read_io;
 
@@ -317,8 +317,8 @@ static int32_t create_metalog_mapping_table (struct f2fs_sb_info* sbi)
 			up_read (&io->io_rwsem);
 
 			/* get the virtual address from the page */
-			ptr_page_addr = (__le32*)page_address (page);
-			new_map_blk = (struct alfs_map_blk*)ptr_page_addr;
+			ptr_page_addr = (__le32 *)page_address (page);
+			new_map_blk = (struct alfs_map_blk *)ptr_page_addr;
 
 			/* check version # */
 			if (new_map_blk->magic == cpu_to_le32 (0xEF)) {
@@ -366,9 +366,9 @@ out:
 	return ret;
 }
 
-static int32_t create_metalog_summary_table (struct f2fs_sb_info* sbi)
+static int32_t create_metalog_summary_table (struct f2fs_sb_info *sbi)
 {
-	struct alfs_info* ai = ALFS_AI (sbi);
+	struct alfs_info *ai = ALFS_AI (sbi);
 	uint32_t sum_length = 0;
 	uint32_t i = 0, j = 0;
 	uint8_t is_dead = 1;
@@ -383,7 +383,7 @@ static int32_t create_metalog_summary_table (struct f2fs_sb_info* sbi)
 
 	/* allocate the memory space for the summary table */
 	if ((ai->summary_table =
-			(uint8_t*)kmalloc (sum_length * F2FS_BLKSIZE, GFP_KERNEL)) == NULL) {
+			(uint8_t *)kmalloc (sum_length * F2FS_BLKSIZE, GFP_KERNEL)) == NULL) {
 		f2fs_msg(sbi->sb, KERN_ERR, "Errors occur while allocating memory space for the mapping table");
 		ret = -1;
 		goto out;
@@ -440,18 +440,18 @@ out:
 }
 
 
-static void destroy_metalog_summary_table (struct f2fs_sb_info* sbi)
+static void destroy_metalog_summary_table (struct f2fs_sb_info *sbi)
 {
-	struct alfs_info* ai = ALFS_AI (sbi);
+	struct alfs_info *ai = ALFS_AI (sbi);
 	if (ai->summary_table) {
 		kfree (ai->summary_table);
 		ai->summary_table = NULL;
 	}
 }
 
-static void destroy_metalog_mapping_table (struct f2fs_sb_info* sbi)
+static void destroy_metalog_mapping_table (struct f2fs_sb_info *sbi)
 {
-	struct alfs_info* ai = ALFS_AI (sbi);
+	struct alfs_info *ai = ALFS_AI (sbi);
 
 	if (ai->map_blks) {
 		kfree (ai->map_blks);
@@ -459,7 +459,7 @@ static void destroy_metalog_mapping_table (struct f2fs_sb_info* sbi)
 	}
 }
 
-static void destroy_ai (struct f2fs_sb_info* sbi)
+static void destroy_ai (struct f2fs_sb_info *sbi)
 {
 	if (sbi->ai) {
 		kfree (sbi->ai);
@@ -471,14 +471,14 @@ static void destroy_ai (struct f2fs_sb_info* sbi)
 /*
  * create the structure for ALFS (ai)
  */
-int32_t alfs_create_ai (struct f2fs_sb_info* sbi)
+int32_t alfs_create_ai (struct f2fs_sb_info *sbi)
 {
-	struct alfs_info* ai = NULL;
+	struct alfs_info *ai = NULL;
 	uint32_t nr_logi_metalog_segments = 0;
 	uint32_t nr_phys_metalog_segments = 0;
 
 	/* create alfs_info structure */
-	if ((ai = (struct alfs_info*)kmalloc (
+	if ((ai = (struct alfs_info *)kmalloc (
 			sizeof (struct alfs_info), GFP_KERNEL)) == NULL) {
 		f2fs_msg(sbi->sb, KERN_INFO, "Errors occur while creating alfs_info");
 		return -1;
@@ -545,7 +545,7 @@ error_metalog_mapping:
 	return -1;
 }
 
-void alfs_destory_ai (struct f2fs_sb_info* sbi)
+void alfs_destory_ai (struct f2fs_sb_info *sbi)
 {
 	destroy_metalog_summary_table (sbi);
 	destroy_metalog_mapping_table (sbi);
@@ -555,9 +555,9 @@ void alfs_destory_ai (struct f2fs_sb_info* sbi)
 /*
  * mapping table management
  */
-int32_t get_mapping_free_blks (struct f2fs_sb_info* sbi)
+int32_t get_mapping_free_blks (struct f2fs_sb_info *sbi)
 {
-	struct alfs_info* ai = ALFS_AI (sbi);
+	struct alfs_info *ai = ALFS_AI (sbi);
 	uint32_t nr_free_blks;
 
 	if (ai->mapping_gc_sblkofs < ai->mapping_gc_eblkofs) {
@@ -573,7 +573,7 @@ int32_t get_mapping_free_blks (struct f2fs_sb_info* sbi)
 	return nr_free_blks;
 }
 
-int8_t is_mapping_gc_needed (struct f2fs_sb_info* sbi, int32_t nr_free_blks)
+int8_t is_mapping_gc_needed (struct f2fs_sb_info *sbi, int32_t nr_free_blks)
 {
 	if (nr_free_blks <= (sbi->segs_per_sec * sbi->blocks_per_seg)) {
 		return 0;
@@ -581,9 +581,9 @@ int8_t is_mapping_gc_needed (struct f2fs_sb_info* sbi, int32_t nr_free_blks)
 	return -1;
 }
 
-int8_t alfs_do_mapping_gc (struct f2fs_sb_info* sbi)
+int8_t alfs_do_mapping_gc (struct f2fs_sb_info *sbi)
 {
-	struct alfs_info* ai = ALFS_AI (sbi);
+	struct alfs_info *ai = ALFS_AI (sbi);
 
 	/* perform gc */
 	alfs_do_trim (sbi, ai->mapping_blkofs + ai->mapping_gc_sblkofs, ai->blks_per_sec);
@@ -595,10 +595,10 @@ int8_t alfs_do_mapping_gc (struct f2fs_sb_info* sbi)
 	return 0;
 }
 
-int32_t alfs_write_mapping_entries (struct f2fs_sb_info* sbi)
+int32_t alfs_write_mapping_entries (struct f2fs_sb_info *sbi)
 {
-	struct alfs_info* ai = ALFS_AI (sbi);
-	struct page* page = NULL;
+	struct alfs_info *ai = ALFS_AI (sbi);
+	struct page *page = NULL;
 	int32_t nr_free_blks = 0;
 	uint32_t i = 0;
 
@@ -612,7 +612,7 @@ int32_t alfs_write_mapping_entries (struct f2fs_sb_info* sbi)
 
 	/* write dirty entries to the mapping area */
 	for (i = 0; i < ai->nr_mapping_logi_blks; i++) {
-		__le32* ptr_page_addr = NULL;
+		__le32 *ptr_page_addr = NULL;
 		uint32_t version = 0;
 
 		/* see if it is dirty or not */
@@ -634,7 +634,7 @@ int32_t alfs_write_mapping_entries (struct f2fs_sb_info* sbi)
 		lock_page (page);
 
 		/* write dirty entires to NAND flash */
-		ptr_page_addr = (__le32*)page_address (page);
+		ptr_page_addr = (__le32 *)page_address (page);
 		memcpy (ptr_page_addr, &ai->map_blks[i], F2FS_BLKSIZE);
 
 		alfs_writepage_flash (sbi, page, ai->mapping_blkofs + ai->mapping_gc_eblkofs, 0);
@@ -651,9 +651,9 @@ int32_t alfs_write_mapping_entries (struct f2fs_sb_info* sbi)
 /*
  * metalog management
  */
-int32_t is_valid_meta_lblkaddr (struct f2fs_sb_info* sbi, block_t lblkaddr)
+int32_t is_valid_meta_lblkaddr (struct f2fs_sb_info *sbi, block_t lblkaddr)
 {
-	struct alfs_info* ai = ALFS_AI (sbi);
+	struct alfs_info *ai = ALFS_AI (sbi);
 
 	if (sbi->ai == NULL)
 		return -1;
@@ -665,9 +665,9 @@ int32_t is_valid_meta_lblkaddr (struct f2fs_sb_info* sbi, block_t lblkaddr)
 	return -1;
 }
 
-int32_t is_valid_meta_pblkaddr (struct f2fs_sb_info* sbi, block_t pblkaddr)
+int32_t is_valid_meta_pblkaddr (struct f2fs_sb_info *sbi, block_t pblkaddr)
 {
-	struct alfs_info* ai = ALFS_AI (sbi);
+	struct alfs_info *ai = ALFS_AI (sbi);
 
 	if (sbi->ai == NULL)
 		return -1;
@@ -679,9 +679,9 @@ int32_t is_valid_meta_pblkaddr (struct f2fs_sb_info* sbi, block_t pblkaddr)
 	return -1;
 }
 
-int32_t get_metalog_free_blks (struct f2fs_sb_info* sbi)
+int32_t get_metalog_free_blks (struct f2fs_sb_info *sbi)
 {
-	struct alfs_info* ai = ALFS_AI (sbi);
+	struct alfs_info *ai = ALFS_AI (sbi);
 	uint32_t nr_free_blks;
 
 	if (ai->metalog_gc_sblkofs < ai->metalog_gc_eblkofs) {
@@ -697,9 +697,9 @@ int32_t get_metalog_free_blks (struct f2fs_sb_info* sbi)
 	return nr_free_blks;
 }
 
-int8_t is_gc_needed (struct f2fs_sb_info* sbi, int32_t nr_free_blks)
+int8_t is_gc_needed (struct f2fs_sb_info *sbi, int32_t nr_free_blks)
 {
-	struct alfs_info* ai = ALFS_AI (sbi);
+	struct alfs_info *ai = ALFS_AI (sbi);
 
 	mutex_lock (&ai->alfs_gc_mutex);
 	if (nr_free_blks <= (sbi->segs_per_sec * sbi->blocks_per_seg)) {
@@ -711,9 +711,9 @@ int8_t is_gc_needed (struct f2fs_sb_info* sbi, int32_t nr_free_blks)
 	return -1;
 }
 
-uint32_t alfs_get_mapped_pblkaddr (struct f2fs_sb_info* sbi, block_t lblkaddr)
+uint32_t alfs_get_mapped_pblkaddr (struct f2fs_sb_info *sbi, block_t lblkaddr)
 {
-	struct alfs_info* ai = ALFS_AI (sbi);
+	struct alfs_info *ai = ALFS_AI (sbi);
 	block_t pblkaddr;
 	block_t new_lblkaddr;
 
@@ -749,9 +749,9 @@ uint32_t alfs_get_mapped_pblkaddr (struct f2fs_sb_info* sbi, block_t lblkaddr)
 	return pblkaddr;
 }
 
-uint32_t alfs_get_new_pblkaddr (struct f2fs_sb_info* sbi, block_t lblkaddr, uint32_t length)
+uint32_t alfs_get_new_pblkaddr (struct f2fs_sb_info *sbi, block_t lblkaddr, uint32_t length)
 {
-	struct alfs_info* ai = ALFS_AI (sbi);
+	struct alfs_info *ai = ALFS_AI (sbi);
 	block_t pblkaddr = NULL_ADDR;
 
 	/* see if ri is initialized or not */
@@ -777,9 +777,9 @@ uint32_t alfs_get_new_pblkaddr (struct f2fs_sb_info* sbi, block_t lblkaddr, uint
 	return pblkaddr;
 }
 
-int8_t alfs_map_l2p (struct f2fs_sb_info* sbi, block_t lblkaddr, block_t pblkaddr, uint32_t length)
+int8_t alfs_map_l2p (struct f2fs_sb_info *sbi, block_t lblkaddr, block_t pblkaddr, uint32_t length)
 {
-	struct alfs_info* ai = ALFS_AI (sbi);
+	struct alfs_info *ai = ALFS_AI (sbi);
 	block_t cur_lblkaddr = lblkaddr;
 	block_t cur_pblkaddr = pblkaddr;
 	block_t new_lblkaddr;
@@ -849,7 +849,7 @@ int8_t alfs_map_l2p (struct f2fs_sb_info* sbi, block_t lblkaddr, block_t pblkadd
 	return 0;
 }
 
-int8_t alfs_do_trim (struct f2fs_sb_info* sbi, block_t pblkaddr, uint32_t nr_blks)
+int8_t alfs_do_trim (struct f2fs_sb_info *sbi, block_t pblkaddr, uint32_t nr_blks)
 {
 	if (test_opt (sbi, DISCARD)) {
 		blkdev_issue_discard (
@@ -863,10 +863,10 @@ int8_t alfs_do_trim (struct f2fs_sb_info* sbi, block_t pblkaddr, uint32_t nr_blk
 	return -1;
 }
 
-int8_t alfs_do_gc (struct f2fs_sb_info* sbi)
+int8_t alfs_do_gc (struct f2fs_sb_info *sbi)
 {
-	struct alfs_info* ai = ALFS_AI (sbi);
-	struct page* page = NULL;
+	struct alfs_info *ai = ALFS_AI (sbi);
+	struct page *page = NULL;
 
 	uint32_t cur_blkofs = 0;
 	uint32_t loop = 0;
@@ -975,14 +975,14 @@ int8_t alfs_do_gc (struct f2fs_sb_info* sbi)
 	return 0;
 }
 
-void alfs_submit_bio_w (struct f2fs_sb_info* sbi, struct bio* bio, uint8_t sync)
+void alfs_submit_bio_w (struct f2fs_sb_info *sbi, struct bio *bio, uint8_t sync)
 {
-	struct page* src_page = NULL;
-	struct page* dst_page = NULL;
+	struct page *src_page = NULL;
+	struct page *dst_page = NULL;
 	struct bio_vec *bvec = NULL;
 
-	uint8_t* src_page_addr = NULL;
-	uint8_t* dst_page_addr = NULL;
+	uint8_t *src_page_addr = NULL;
+	uint8_t *dst_page_addr = NULL;
 	uint32_t bioloop = 0;
 	int8_t ret = 0;
 
@@ -1028,8 +1028,8 @@ void alfs_submit_bio_w (struct f2fs_sb_info* sbi, struct bio* bio, uint8_t sync)
 		spin_unlock (&sbi->mapping_lock);
 
 		/* write the requested page */
-		src_page_addr = (uint8_t*)page_address (src_page);
-		dst_page_addr = (uint8_t*)page_address (dst_page);
+		src_page_addr = (uint8_t *)page_address (src_page);
+		dst_page_addr = (uint8_t *)page_address (dst_page);
 		memcpy (dst_page_addr, src_page_addr, PAGE_SIZE);
 
 		if (alfs_writepage_flash (sbi, dst_page, pblkaddr, sync) != 0) {
@@ -1050,14 +1050,14 @@ out:
 }
 
 
-void alfs_submit_merged_bio_w (struct f2fs_sb_info* sbi, struct bio* bio, uint8_t sync)
+void alfs_submit_merged_bio_w (struct f2fs_sb_info *sbi, struct bio *bio, uint8_t sync)
 {
-	struct page* src_page = NULL;
-	struct page* dst_page = NULL;
+	struct page *src_page = NULL;
+	struct page *dst_page = NULL;
 	struct bio_vec *bvec = NULL;
-	struct bio* new_bio = NULL;
-	uint8_t* src_page_addr = NULL;
-	uint8_t* dst_page_addr = NULL;
+	struct bio *new_bio = NULL;
+	uint8_t *src_page_addr = NULL;
+	uint8_t *dst_page_addr = NULL;
 	uint32_t bioloop = 0;
 	int8_t ret = 0;
 
@@ -1103,8 +1103,8 @@ void alfs_submit_merged_bio_w (struct f2fs_sb_info* sbi, struct bio* bio, uint8_
 		lock_page (dst_page);
 
 		/* write the requested page */
-		src_page_addr = (uint8_t*)page_address (src_page);
-		dst_page_addr = (uint8_t*)page_address (dst_page);
+		src_page_addr = (uint8_t *)page_address (src_page);
+		dst_page_addr = (uint8_t *)page_address (dst_page);
 
 		memcpy (dst_page_addr, src_page_addr, PAGE_SIZE);
 
@@ -1137,14 +1137,14 @@ out:
 
 
 
-void alfs_submit_bio_r (struct f2fs_sb_info* sbi, struct bio* bio)
+void alfs_submit_bio_r (struct f2fs_sb_info *sbi, struct bio *bio)
 {
-	struct page* src_page = NULL;
-	struct page* dst_page = NULL;
+	struct page *src_page = NULL;
+	struct page *dst_page = NULL;
 	struct bio_vec *bvec = NULL;
 
-	uint8_t* src_page_addr = NULL;
-	uint8_t* dst_page_addr = NULL;
+	uint8_t *src_page_addr = NULL;
+	uint8_t *dst_page_addr = NULL;
 	uint32_t bioloop = 0;
 	int8_t ret = 0;
 
@@ -1187,8 +1187,8 @@ void alfs_submit_bio_r (struct f2fs_sb_info* sbi, struct bio* bio)
 		}
 
 		/* copy memory data */
-		src_page_addr = (uint8_t*)page_address (src_page);
-		dst_page_addr = (uint8_t*)page_address (dst_page);
+		src_page_addr = (uint8_t *)page_address (src_page);
+		dst_page_addr = (uint8_t *)page_address (dst_page);
 		memcpy (dst_page_addr, src_page_addr, PAGE_SIZE);
 
 		/* go to the next page */
@@ -1209,7 +1209,7 @@ out:
 	}
 }
 
-static uint8_t alfs_is_cp_blk (struct f2fs_sb_info* sbi, block_t lblkaddr)
+static uint8_t alfs_is_cp_blk (struct f2fs_sb_info *sbi, block_t lblkaddr)
 {
 	block_t start_addr =
 		le32_to_cpu(F2FS_RAW_SUPER(sbi)->cp_blkaddr);
@@ -1222,7 +1222,7 @@ static uint8_t alfs_is_cp_blk (struct f2fs_sb_info* sbi, block_t lblkaddr)
 	return 0;
 }
 
-void alfs_submit_bio (struct f2fs_sb_info* sbi, int rw, struct bio * bio, uint8_t sync)
+void alfs_submit_bio (struct f2fs_sb_info *sbi, int rw, struct bio *bio, uint8_t sync)
 {
 	block_t lblkaddr = bio->bi_iter.bi_sector * 512 / 4096;
 
@@ -1245,7 +1245,7 @@ void alfs_submit_bio (struct f2fs_sb_info* sbi, int rw, struct bio * bio, uint8_
 	}
 }
 
-void alfs_submit_merged_bio (struct f2fs_sb_info* sbi, int rw, struct bio * bio, uint8_t sync)
+void alfs_submit_merged_bio (struct f2fs_sb_info *sbi, int rw, struct bio *bio, uint8_t sync)
 {
 	block_t lblkaddr = bio->bi_iter.bi_sector * 512 / 4096;
 
