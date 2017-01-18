@@ -35,6 +35,10 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/f2fs.h>
 
+#ifdef ALFS_SNAPSHOT
+#include "alfs_ext.h"
+#endif
+
 static struct proc_dir_entry *f2fs_proc_root;
 static struct kmem_cache *f2fs_inode_cachep;
 static struct kset *f2fs_kset;
@@ -749,7 +753,10 @@ static void f2fs_put_super(struct super_block *sb)
 		};
 		write_checkpoint(sbi, &cpc);
 	}
-
+#ifdef ALFS_SNAPSHOT
+	alfs_write_mapping_entries(sbi);
+	alfs_destory_ai(sbi);
+#endif
 	/* write_checkpoint can update stat informaion */
 	f2fs_destroy_stats(sbi);
 
@@ -1292,6 +1299,20 @@ static inline bool sanity_check_area_boundary(struct f2fs_sb_info *sbi,
 	u64 seg_end_blkaddr = segment0_blkaddr +
 				(segment_count << log_blocks_per_seg);
 
+#if defined(ALFS_SNAPSHOT) && defined(ALFS_META_LOGGING)
+#define NR_SUPERBLK_SECS	1	/* # of sections for the super block */
+#define NR_MAPPING_SECS		3	/* # of sections for mapping entries */
+#define NR_METALOG_TIMES	2	/* # of sections for meta-log */
+	u_int64_t total_meta_segments = 0;
+	u_int32_t nr_meta_logging_segments = 0;
+	u_int32_t nr_meta_logging_blks = 0;
+
+	total_meta_segments = segment_count_ckpt + segment_count_sit +
+					segment_count_nat + segment_count_ssa;
+	nr_meta_logging_segments =
+				total_meta_segments * (NR_METALOG_TIMES - 1);
+	nr_meta_logging_blks = (nr_meta_logging_segments << log_blocks_per_seg);
+#endif
 	if (segment0_blkaddr != cp_blkaddr) {
 		f2fs_msg(sb, KERN_INFO,
 			"Mismatch start address, segment0(%u) cp_blkaddr(%u)",
@@ -1326,6 +1347,44 @@ static inline bool sanity_check_area_boundary(struct f2fs_sb_info *sbi,
 		return true;
 	}
 
+#if defined(ALFS_SNAPSHOT) && defined(ALFS_META_LOGGING)
+	if (ssa_blkaddr + (segment_count_ssa << log_blocks_per_seg) +
+				(nr_meta_logging_blks) != main_blkaddr) {
+		f2fs_msg(sb, KERN_INFO,
+			"Wrong SSA boundary, ssa_blkaddr(%u) ssa_blks(%u)",
+			ssa_blkaddr, segment_count_ssa << log_blocks_per_seg);
+		f2fs_msg(sb, KERN_INFO, "meta_logging_blks(%u) main_addr(%u)",
+				nr_meta_logging_blks, main_blkaddr);
+		f2fs_msg(sb, KERN_INFO, "-----------------------------------");
+		f2fs_msg(sb, KERN_INFO, "segment0_blkaddr(%u)",
+							segment0_blkaddr);
+		f2fs_msg(sb, KERN_INFO, "cp_blkaddr(%u)", cp_blkaddr);
+		f2fs_msg(sb, KERN_INFO, "sit_blkaddr(%u)", sit_blkaddr);
+		f2fs_msg(sb, KERN_INFO, "nat_blkaddr(%u)", nat_blkaddr);
+		f2fs_msg(sb, KERN_INFO, "ssa_blkaddr(%u)", ssa_blkaddr);
+		f2fs_msg(sb, KERN_INFO, "main_blkaddr(%u)", main_blkaddr);
+		f2fs_msg(sb, KERN_INFO, "segment_count_ckpt(%u)",
+							segment_count_ckpt);
+		f2fs_msg(sb, KERN_INFO, "segment_count_sit(%u)",
+							segment_count_sit);
+		f2fs_msg(sb, KERN_INFO, "segment_count_nat(%u)",
+							segment_count_nat);
+		f2fs_msg(sb, KERN_INFO, "segment_count_ssa(%u)",
+							segment_count_ssa);
+		f2fs_msg(sb, KERN_INFO, "segment_count_main(%u)",
+							segment_count_main);
+		f2fs_msg(sb, KERN_INFO, "segment_count(%u)",
+							segment_count);
+		f2fs_msg(sb, KERN_INFO, "log_blocks_per_seg(%u)",
+							log_blocks_per_seg);
+		f2fs_msg(sb, KERN_INFO, "main_end_blkaddr(%llu)",
+							main_end_blkaddr);
+		f2fs_msg(sb, KERN_INFO, "seg_end_blkaddr(%llu)",
+							seg_end_blkaddr);
+		f2fs_msg(sb, KERN_INFO, "-----------------------------------");
+		return true;
+	}
+#else
 	if (ssa_blkaddr + (segment_count_ssa << log_blocks_per_seg) !=
 							main_blkaddr) {
 		f2fs_msg(sb, KERN_INFO,
@@ -1334,7 +1393,7 @@ static inline bool sanity_check_area_boundary(struct f2fs_sb_info *sbi,
 			segment_count_ssa << log_blocks_per_seg);
 		return true;
 	}
-
+#endif
 	if (main_end_blkaddr > seg_end_blkaddr) {
 		f2fs_msg(sb, KERN_INFO,
 			"Wrong MAIN_AREA boundary, start(%u) end(%u) block(%u)",
@@ -1367,6 +1426,15 @@ static inline bool sanity_check_area_boundary(struct f2fs_sb_info *sbi,
 		if (err)
 			return true;
 	}
+#if defined(ALFS_SNAPSHOT) && defined(ALFS_META_LOGGING)
+	/* meta-log region check */
+	if (NR_METALOG_TIMES % 2 != 0) {
+		f2fs_msg(sb, KERN_INFO,
+			"ERROR: NR_METALOG_TIMES must be even numbers = %u\n",
+							NR_METALOG_TIMES);
+		return true;
+	}
+#endif
 	return false;
 }
 
@@ -1888,6 +1956,25 @@ try_onemore:
 		goto free_options;
 	}
 
+#ifdef ALFS_SNAPSHOT
+	spin_lock_init(&sbi->mapping_lock);
+	f2fs_msg(sb, KERN_INFO, "ALFS on F2FS is initialized");
+
+	err = alfs_create_ai(sbi);
+	if (err) {
+		f2fs_msg(sb, KERN_ERR,
+				"Failed to initialize ALFS information");
+		goto free_options;
+	}
+
+	f2fs_msg(sb, KERN_INFO, " alfs_create_ai has created ");
+	err = alfs_build_ai(sbi);
+	if (err) {
+		f2fs_msg(sb, KERN_ERR, "Failed to build ALFS information");
+		goto free_alfs;
+	}
+#endif
+
 	err = get_valid_checkpoint(sbi);
 	if (err) {
 		f2fs_msg(sb, KERN_ERR, "Failed to get valid F2FS checkpoint");
@@ -1916,7 +2003,6 @@ try_onemore:
 	}
 
 	init_extent_cache_info(sbi);
-
 	init_ino_entry_info(sbi);
 
 	/* setup f2fs internal modules */
@@ -2103,6 +2189,10 @@ free_devices:
 free_meta_inode:
 	make_bad_inode(sbi->meta_inode);
 	iput(sbi->meta_inode);
+#ifdef ALFS_SNAPSHOT
+free_alfs:
+	alfs_destory_ai(sbi);
+#endif
 free_options:
 	destroy_percpu_info(sbi);
 	kfree(options);
