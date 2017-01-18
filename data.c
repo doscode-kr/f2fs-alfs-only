@@ -29,6 +29,9 @@
 #include "trace.h"
 #include <trace/events/f2fs.h>
 
+#ifdef ALFS_SNAPSHOT
+#include "alfs_ext.h"
+#endif
 static bool __is_cp_guaranteed(struct page *page)
 {
 	struct address_space *mapping = page->mapping;
@@ -311,7 +314,11 @@ int f2fs_submit_page_bio(struct f2fs_io_info *fio)
 	}
 	bio_set_op_attrs(bio, fio->op, fio->op_flags);
 
+#ifdef ALFS_META_LOGGING
+	alfs_submit_merged_bio(fio->sbi, (bio_op(bio)), bio, 0);
+#else
 	__submit_bio(fio->sbi, bio, fio->type);
+#endif
 	return 0;
 }
 
