@@ -23,6 +23,10 @@
 #include "trace.h"
 #include <trace/events/f2fs.h>
 
+#ifdef ALFS_SNAPSHOT
+#include "alfs_ext.h"
+#endif
+
 #define __reverse_ffz(x) __reverse_ffs(~(x))
 
 static struct kmem_cache *discard_entry_slab;
@@ -621,6 +625,12 @@ static void locate_dirty_segment(struct f2fs_sb_info *sbi, unsigned int segno)
 	}
 
 	mutex_unlock(&dirty_i->seglist_lock);
+#ifdef ALFS_TRIM
+	if (valid_blocks == 0) {
+		alfs_do_trim(sbi, START_BLOCK(sbi, segno),
+					sbi->blocks_per_seg);
+	}
+#endif
 }
 
 static struct bio_entry *__add_bio_entry(struct f2fs_sb_info *sbi,
