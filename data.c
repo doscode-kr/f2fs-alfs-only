@@ -178,7 +178,13 @@ static inline void __submit_bio(struct f2fs_sb_info *sbi,
 			current->plug && (type == DATA || type == NODE))
 			blk_finish_plug(current->plug);
 	}
+f2fs_alfs_trace(__FUNCTION__, -1, -1);
+#ifdef ALFS_META_LOGGING
+	f2fs_msg(sbi->sb, KERN_ERR, "CALL alfs_submit_merged_bio");
+	alfs_submit_merged_bio(sbi, (bio_op(bio)), bio, 0);
+#else
 	submit_bio(bio);
+#endif
 }
 
 static void __submit_merged_bio(struct f2fs_bio_info *io)
@@ -313,12 +319,7 @@ int f2fs_submit_page_bio(struct f2fs_io_info *fio)
 		return -EFAULT;
 	}
 	bio_set_op_attrs(bio, fio->op, fio->op_flags);
-
-#ifdef ALFS_META_LOGGING
-	alfs_submit_merged_bio(fio->sbi, (bio_op(bio)), bio, 0);
-#else
 	__submit_bio(fio->sbi, bio, fio->type);
-#endif
 	return 0;
 }
 

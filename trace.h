@@ -36,7 +36,7 @@ extern void f2fs_trace_pid(struct page *);
 extern void f2fs_trace_ios(struct f2fs_io_info *, int);
 extern void f2fs_build_trace_ios(void);
 extern void f2fs_destroy_trace_ios(void);
-extern void f2fs_alfs_trace(char *func_name, int op, int type);
+extern void f2fs_alfs_trace(const char *func_name, int op, int type);
 #else
 #define f2fs_trace_pid(p)
 #define f2fs_trace_ios(i, n)

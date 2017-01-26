@@ -161,7 +161,7 @@ void f2fs_destroy_trace_ios(void)
 	spin_unlock(&pids_lock);
 }
 
-void f2fs_alfs_trace(char *func_name, int op, int type)
+void f2fs_alfs_trace(const char *func_name, int op, int type)
 {
 	char *t, *o;
 	switch (op)
@@ -173,10 +173,11 @@ void f2fs_alfs_trace(char *func_name, int op, int type)
 	}
 	switch (type)
 	{
+		case -1: t = "----"; break;
 		case NODE: t = "NODE"; break;
 		case META: t = "META"; break;
 		case DATA: t = "DATA"; break;
-		case -1 : t = "MAPP"; break;
+		case 9: t = "MAPP"; break;
 		default: t = "```?"; break;
 	}
 	trace_printk("%30s , rw = %5s, %5s\n",
