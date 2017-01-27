@@ -901,6 +901,7 @@ int8_t alfs_map_l2p(struct f2fs_sb_info *sbi, block_t lblkaddr,
 			ai->summary_table[prev_pblkaddr - ai->metalog_blkofs] = 2;	/* set to invalid */
 
 			/* trim */
+			f2fs_alfs_trace_l2p_discard(prev_pblkaddr, sbi->segs_per_sec);
 			if (alfs_do_trim(sbi, prev_pblkaddr, 1) == -1) {
 				f2fs_msg(sbi->sb, KERN_ERR, KERN_INFO "Errors occur while trimming the page during alfs_map_l2p");
 			}

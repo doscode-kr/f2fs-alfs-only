@@ -183,3 +183,17 @@ void f2fs_alfs_trace(const char *func_name, int op, int type)
 	trace_printk("%30s , rw = %5s, %5s\n",
 			func_name, o, t);
 }
+
+void f2fs_alfs_trace_l2p_discard(int blk_addr, int num_section)
+{
+	// if `blk_addr` is 31554,
+	int n_segment = 512;
+	int n_sg_head = blk_addr / n_segment;
+	int n_sg_tail = blk_addr % n_segment;
+	int n_sc_head = blk_addr / (n_segment * num_section);	// 7
+	int n_sc_mid  = (blk_addr - (n_segment * num_section * n_sc_head)) / n_segment;	//5
+	int n_sc_tail = blk_addr % n_segment;	// 322
+
+	trace_printk("b.addr %10d b.addr ||  %4d SG + %3d b.addr ||  %3d SC %3d SG + %3d\n",
+			blk_addr, n_sg_head, n_sg_tail, n_sc_head, n_sc_mid, n_sc_tail	);
+}
