@@ -627,6 +627,7 @@ static void locate_dirty_segment(struct f2fs_sb_info *sbi, unsigned int segno)
 	mutex_unlock(&dirty_i->seglist_lock);
 #ifdef ALFS_TRIM
 	if (valid_blocks == 0) {
+		f2fs_alfs_trace_locate_dt_sgmt_discard( START_BLOCK(sbi, segno), sbi->segs_per_sec, sbi->blocks_per_seg);
 		alfs_do_trim(sbi, START_BLOCK(sbi, segno),
 					sbi->blocks_per_seg);
 	}

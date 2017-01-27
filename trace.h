@@ -38,6 +38,7 @@ extern void f2fs_build_trace_ios(void);
 extern void f2fs_destroy_trace_ios(void);
 extern void f2fs_alfs_trace(const char *func_name, int op, int type);
 extern void f2fs_alfs_trace_l2p_discard(int blk_addr, int num_section);
+extern void f2fs_alfs_trace_locate_dt_sgmt_discard(int blk_addr, int num_section, int length);
 
 #else
 #define f2fs_trace_pid(p)
@@ -46,5 +47,6 @@ extern void f2fs_alfs_trace_l2p_discard(int blk_addr, int num_section);
 #define f2fs_destroy_trace_ios()
 #define f2fs_alfs_trace(func_name, op, type)
 #define f2fs_alfs_trace_l2p_discard(blk_addr, num_section)
+#define f2fs_alfs_trace_locate_dt_sgmt_discard(blk_addr, num_section, length)
 #endif
 #endif /* __F2FS_TRACE_H__ */
